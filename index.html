@@ -24,4 +24,34 @@
   </style>
 </head>
 
-<
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // Création de la carte
+    var map = L.map('map').setView([46.6, 2.5], 6);
+
+    // Fond de carte
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // ZONE INTERDITE (EXEMPLE)
+    var zoneInterdite = L.polygon([
+      [48.8606, 2.3376],
+      [48.8615, 2.3400],
+      [48.8588, 2.3415],
+      [48.8575, 2.3380]
+    ], {
+      color: 'red',
+      fillColor: 'red',
+      fillOpacity: 0.5
+    }).addTo(map);
+
+    zoneInterdite.bindPopup("🚫 Zone interdite à la détection");
+  </script>
+</body>
+</html>
