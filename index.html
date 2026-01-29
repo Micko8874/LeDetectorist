@@ -5,14 +5,12 @@
   <title>LeDetectorist</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    body, html { margin: 0; padding: 0; height: 100%; }
-    #map { width: 100%; height: 100%; }
+    body, html { margin:0; padding:0; height:100%; }
+    #map { width:100%; height:100%; }
   </style>
 </head>
 
@@ -23,24 +21,21 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  // Initialisation de la carte
   var map = L.map('map').setView([46.6, 2.5], 6);
 
-  // Fond OpenStreetMap
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Groupe pour les zones interdites
   var zonesLayer = L.layerGroup().addTo(map);
+  var userMarker = null;
+  var alertShown = false;
 
-  // Fonction pour charger les zones automatiquement
   function chargerZonesInterdites() {
     zonesLayer.clearLayers();
 
-    var bounds = map.getBounds();
-    var bbox = bounds.getSouth() + "," + bounds.getWest() + "," +
-               bounds.getNorth() + "," + bounds.getEast();
+    var b = map.getBounds();
+    var bbox = b.getSouth()+","+b.getWest()+","+b.getNorth()+","+b.getEast();
 
     var query = `
       [out:json];
@@ -65,23 +60,49 @@
         if (!el.geometry) return;
 
         var coords = el.geometry.map(p => [p.lat, p.lon]);
-
         var zone = L.polygon(coords, {
-          color: "red",
-          fillColor: "red",
-          fillOpacity: 0.35
+          color:"red",
+          fillColor:"red",
+          fillOpacity:0.35
         }).addTo(zonesLayer);
 
-        zone.bindPopup("🚫 Zone protégée<br>Détection déconseillée");
+        zone.bindPopup("🚫 Zone protégée");
       });
     });
   }
 
-  // Charger au départ
   map.whenReady(chargerZonesInterdites);
-
-  // Recharger quand on bouge la carte
   map.on("moveend", chargerZonesInterdites);
+
+  // 📍 GÉOLOCALISATION UTILISATEUR
+  map.locate({ watch:true, enableHighAccuracy:true });
+
+  map.on("locationfound", function(e) {
+    var latlng = e.latlng;
+
+    if (!userMarker) {
+      userMarker = L.circleMarker(latlng, {
+        radius:8,
+        color:"blue",
+        fillColor:"blue",
+        fillOpacity:0.8
+      }).addTo(map);
+      map.setView(latlng, 15);
+    } else {
+      userMarker.setLatLng(latlng);
+    }
+
+    // ⚠️ DÉTECTION ZONE INTERDITE
+    zonesLayer.eachLayer(function(zone) {
+      if (zone.getBounds().contains(latlng)) {
+        if (!alertShown) {
+          alert("⚠️ ATTENTION\nVous êtes dans une zone protégée.\nDétection interdite.");
+          alertShown = true;
+        }
+      }
+    });
+  });
+
 </script>
 
 </body>
