@@ -11,12 +11,31 @@
   <style>
     body, html { margin:0; padding:0; height:100%; }
     #map { width:100%; height:100%; }
+
+    .meteo {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .bon { color: green; font-weight: bold; }
+    .mauvais { color: red; font-weight: bold; }
   </style>
 </head>
 
 <body>
 
 <div id="map"></div>
+
+<div class="meteo" id="meteo">
+  🌦️ Chargement météo…
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -33,7 +52,6 @@
 
   function chargerZonesInterdites() {
     zonesLayer.clearLayers();
-
     var b = map.getBounds();
     var bbox = b.getSouth()+","+b.getWest()+","+b.getNorth()+","+b.getEast();
 
@@ -44,8 +62,6 @@
         relation["boundary"="protected_area"](${bbox});
         way["leisure"="nature_reserve"](${bbox});
         relation["leisure"="nature_reserve"](${bbox});
-        way["historic"="archaeological_site"](${bbox});
-        relation["historic"="archaeological_site"](${bbox});
       );
       out geom;
     `;
@@ -54,19 +70,16 @@
       method: "POST",
       body: query
     })
-    .then(res => res.json())
+    .then(r => r.json())
     .then(data => {
       data.elements.forEach(el => {
         if (!el.geometry) return;
-
         var coords = el.geometry.map(p => [p.lat, p.lon]);
-        var zone = L.polygon(coords, {
+        L.polygon(coords, {
           color:"red",
           fillColor:"red",
           fillOpacity:0.35
         }).addTo(zonesLayer);
-
-        zone.bindPopup("🚫 Zone protégée");
       });
     });
   }
@@ -74,35 +87,43 @@
   map.whenReady(chargerZonesInterdites);
   map.on("moveend", chargerZonesInterdites);
 
-  // 📍 GÉOLOCALISATION UTILISATEUR
+  // 📍 GPS + météo
   map.locate({ watch:true, enableHighAccuracy:true });
 
   map.on("locationfound", function(e) {
-    var latlng = e.latlng;
+    var lat = e.latlng.lat;
+    var lon = e.latlng.lng;
 
     if (!userMarker) {
-      userMarker = L.circleMarker(latlng, {
+      userMarker = L.circleMarker(e.latlng, {
         radius:8,
         color:"blue",
         fillColor:"blue",
         fillOpacity:0.8
       }).addTo(map);
-      map.setView(latlng, 15);
+      map.setView(e.latlng, 14);
     } else {
-      userMarker.setLatLng(latlng);
+      userMarker.setLatLng(e.latlng);
     }
 
-    // ⚠️ DÉTECTION ZONE INTERDITE
-    zonesLayer.eachLayer(function(zone) {
-      if (zone.getBounds().contains(latlng)) {
-        if (!alertShown) {
-          alert("⚠️ ATTENTION\nVous êtes dans une zone protégée.\nDétection interdite.");
-          alertShown = true;
-        }
-      }
-    });
-  });
+    // 🌦️ MÉTÉO
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,precipitation,wind_speed_10m`)
+      .then(r => r.json())
+      .then(m => {
+        var t = m.current.temperature_2m;
+        var pluie = m.current.precipitation;
+        var vent = m.current.wind_speed_10m;
 
+        var bon = pluie < 1 && vent < 20;
+        document.getElementById("meteo").innerHTML =
+          `🌡️ ${t}°C<br>
+           🌧️ Pluie : ${pluie} mm<br>
+           💨 Vent : ${vent} km/h<br>
+           <span class="${bon ? "bon" : "mauvais"}">
+           ${bon ? "✔ Conditions favorables" : "✖ Conditions difficiles"}
+           </span>`;
+      });
+  });
 </script>
 
 </body>
